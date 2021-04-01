@@ -1,4 +1,4 @@
-this rep is made only for people who knows why they are here
+**this rep is made only for people who knows why they are here**
 
 thingy.py - it's egg bot for discord, you have to make your own i guess with your own code
 
