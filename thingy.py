@@ -15,12 +15,145 @@ import subprocess
 import traceback
 import time
 import asyncio
+import os
+import platform
 from itertools import count
 from multiprocessing import Process
 from array import *
+import datetime
+import math
+from decimal import *
 
+def mod_date(path_to_file):
+   stat = os.stat(path_to_file)
+   return datetime.datetime.fromtimestamp(stat.st_mtime)
 
 client = discord.Client()
+
+def sumAm(a,b, cumA):
+    val=0
+    if a>0:
+        val = cumA[b]-cumA[a-1]
+    else:
+        val = cumA[b]
+    return val
+
+
+def getProbText(f1, f2, pzlName, nscr):
+    f1 = int(f1)
+    f2 = int(f2)
+    nscr = int(nscr)
+    if nscr == 0:
+        nscr = 1
+    num44 = [1, 2, 4, 10, 24, 54, 107, 212, 446, 946, 1948, 3938, 7808, 15544, 30821, 60842, 119000, 231844, 447342,
+             859744, 1637383, 3098270, 5802411, 10783780, 19826318, 36142146, 65135623, 116238056, 204900019, 357071928,
+             613926161, 1042022040, 1742855397, 2873077198, 4660800459, 7439530828, 11668443776, 17976412262,
+             27171347953, 40271406380, 58469060820, 83099401368, 115516106664, 156935291234, 208207973510, 269527755972,
+             340163141928, 418170132006, 500252508256, 581813416256, 657076739307, 719872287190, 763865196269,
+             784195801886, 777302007562, 742946121222, 683025093505, 603043436904, 509897148964, 412039723036,
+             317373604363, 232306415924, 161303043901, 105730020222, 65450375310, 37942606582, 20696691144, 10460286822,
+             4961671731, 2144789574, 868923831, 311901840, 104859366, 29592634, 7766947, 1508596, 272198, 26638, 3406,
+             70, 17]
+    num33 = [1, 2, 4, 8, 16, 20, 39, 62, 116, 152, 286, 396, 748, 1024, 1893, 2512, 4485, 5638, 9529, 10878, 16993,
+             17110, 23952, 20224, 24047, 15578, 14560, 6274, 3910, 760, 221, 2]
+    maxStates4 = 10461394944000
+    maxStates3 = 181440
+    if pzlName == "3x3":
+        numTable = num33
+        pzlMaxStates = maxStates3
+    if pzlName == "4x4":
+        numTable = num44
+        pzlMaxStates = maxStates4
+    limitNum = len(numTable)-1
+    #print(limitNum)
+    if f1 < 0:
+        f1 = 0
+    if f2 < 0:
+        f1 = 0
+        f2 = 0
+    if f1 > limitNum:
+        f1 = limitNum
+        f2 = limitNum
+    if f2 > limitNum:
+        f2 = limitNum
+    if f1 > f2:
+        f1, f2 = f2, f1
+    out = ""
+    cumP = []
+    cumA = []
+    sum = 0
+    maxV = len(numTable)
+    for i in range(0, maxV):
+        sum += numTable[i]
+        cumA.append(sum)
+        cumP.append(100 * (sum / pzlMaxStates))
+    rp = getRangeP(f1, f2, cumP)
+    out += "The probability of " + bl(pzlName) + " puzzle being optimally solved in "
+    if (f1 != f2):
+        out += "range from " + bl(f1) + " to " + bl(f2) + " moves is "
+    else:
+        out += "*exactly* " + bl(f1) + " moves is "
+    out += editP(rp)
+
+    out += "\n(since there are " + bl(sumAm(f1, f2, cumA)) + " states in that range of total " + str(pzlMaxStates) + " states of this puzzle)"
+    pSc = (1 - ((1 - rp / 100) ** nscr)) * 100
+    #sc = str(pSc)
+    out += "\nThe probability of getting at least one scramble within that range after " + bl(str(nscr)) + " scrambles is " + editP(pSc)
+    #print(nscr)
+    #if nscr > 100:
+    maxi=1
+    maxFind = min(1000, nscr)
+    for i in range (1, maxFind):
+        ber = bernully(i,nscr,rp)
+        maxi=i
+        if ber != "[Very small]":
+            break
+    if bernully(maxi,nscr,rp) == "[Very small]":
+        out += "```Sorry, can't find chance of getting scramble exactly " + str(maxi) + " times after " + str(nscr) + " solves, it's still very small```"
+    else:
+        out += "```"
+        lasti=maxi+17
+        for i in range(maxi, lasti):
+            berv=bernully(i, nscr, rp)
+            if (berv == "1 in i"):
+                berv="[Very big]"
+            out += "\nChance of getting scramble exactly " + str(i) + " times after " + str(nscr) + " solves is " + berv
+        out += "```"
+    out += "\n\nCheck this: https://dphdmn.github.io/15puzzleprob/"
+    return out
+
+def bernully(k, n, p): #k times in n tests, prob = p
+    p = p/100
+    x1 = math.comb(n, k)
+    x2 = (p ** k)
+    x3 = ((1-p) ** (n-k))
+    value = Decimal(x1)*Decimal(x2)*Decimal(x3)
+   # print(bl(str(round(float(Decimal(100) / Decimal(value)), 0))))
+    return editP(value*100).replace("*","")
+
+def getRangeP(a, b, cumP):
+    val = 0
+    if a > 0:
+        val = cumP[b] - cumP[a - 1]
+    else:
+        val = cumP[b]
+    return val
+
+
+def bl(s):
+    return "**" + str(s) + "**"
+
+
+def editP(rp):
+    out = ""
+    if rp == 0:
+        return "[Very small]"
+    if rp < 1:
+        out += "1 in " + bl(str(round(float(Decimal(100) / Decimal(rp)), 0))[:-2])
+    else:
+        out += bl(str(round(float(rp), 2))) + "%"
+    return out
+
 
 class IDAStar:
     def __init__(self, h, neighbours):
@@ -301,7 +434,239 @@ async def on_message(message):
                             news=""
                     await message.channel.send("```"+news+"```")        
         except:
-            await message.channel.send("Something is wrong\n```"+traceback.format_exc()+"```")                    
+            await message.channel.send("Something is wrong\n```"+traceback.format_exc()+"```")
+    if '!getpb' in message.content:
+            with open('shit.txt', 'r') as file:
+                mystr = file.read().lower()#.replace('\n', '')
+            #print(mystr)
+            filedate = str(mod_date("shit.txt")).split(' ')[0]
+            mystr = mystr.splitlines()
+            contentArray = message.content.lower().split(' ')
+            #print(contentArray)
+            username = contentArray[1]
+            matching = [s for s in mystr if username in s]
+            my_string = matching[0]
+            my_string = my_string.split('\t')
+
+            #print(my_string)
+            bad = False
+            try:
+                for i in range(1, len(my_string)):
+                    try:
+                        number = float(my_string[i])
+                        intpart = int(math.floor(number))
+                        decimals = round(number - intpart,3)
+                        x = str(datetime.timedelta(seconds=intpart)) + str(decimals)[1:]
+                    except:
+                        x = ""
+                    if x != "":
+                        if int(intpart) > 60:
+                            my_string[i] = my_string[i] + " (" + x[2:] + ")"
+                puzzle = contentArray[2]
+                outputString = "PBs for user **" + my_string[0] + "** at the puzzle "
+                if puzzle == "3" or puzzle == "3x3":
+                    outputString += "3x3\n```"
+                    outputString += "ao5: " + my_string[1] + "\n"
+                    outputString += "ao12: " + my_string[2] + "\n"
+                    outputString += "ao50: " + my_string[3] + "\n"
+                    outputString += "ao100: " + my_string[4] + "\n"
+                    outputString += "x10 marathon: " + my_string[5] + "\n"
+                    outputString += "x42 marathon: " + my_string[6] + "\n```"
+                elif puzzle == "4" or puzzle == "4x4":
+                    outputString += "4x4\n```"
+                    outputString += "single: " + my_string[7] + "\n"
+                    outputString += "ao5: " + my_string[8] + "\n"
+                    outputString += "ao12: " + my_string[9] + "\n"
+                    outputString += "ao50: " + my_string[10] + "\n"
+                    outputString += "ao100: " + my_string[11] + "\n"
+                    outputString += "x10 marathon: " + my_string[12] + "\n"
+                    outputString += "x42 marathon: " + my_string[13] + "\n"
+                    outputString += "4x4 - 2x2 relay: " + my_string[14] + "\n```"
+                elif puzzle == "5" or puzzle == "5x5":
+                    outputString += "5x5\n```"
+                    outputString += "single: " + my_string[15] + "\n"
+                    outputString += "ao5: " + my_string[16] + "\n"
+                    outputString += "ao12: " + my_string[17] + "\n"
+                    outputString += "ao50: " + my_string[18] + "\n"
+                    outputString += "5x5 - 2x2 relay: " + my_string[19] + "\n```"
+                elif puzzle == "6" or puzzle == "6x6":
+                    outputString += "6x6\n```"
+                    outputString += "single: " + my_string[20] + "\n"
+                    outputString += "ao5: " + my_string[21] + "\n"
+                    outputString += "ao12: " + my_string[22] + "\n"
+                    outputString += "6x6 - 2x2 relay: " + my_string[23] + "\n```"
+                elif puzzle == "7" or puzzle == "7x7":
+                    outputString += "7x7\n```"
+                    outputString += "single: " + my_string[24] + "\n"
+                    outputString += "ao5: " + my_string[25] + "\n"
+                    outputString += "7x7 - 2x2 relay: " + my_string[26] + "\n```"
+                elif puzzle == "8" or puzzle == "8x8":
+                    outputString += "8x8\n```"
+                    outputString += "single: " + my_string[27] + "\n"
+                    outputString += "ao5: " + my_string[28] + "\n```"
+                elif puzzle == "9" or puzzle == "9x9":
+                    outputString += "9x9\n```"
+                    outputString += "single: " + my_string[29] + "\n```"
+                elif puzzle == "10" or puzzle == "10x10":
+                    outputString += "10x10\n```"
+                    outputString += "single: " + my_string[30] + "\n```"
+                else:
+                    await message.channel.send("Can't find this puzzle, make sure it's from 3x3 to 10x10.\nFor other pbs check leaderboard in slidysim.")
+                    bad=True
+                if not bad:
+                    outputString += "\nLast time update: " + filedate
+                    #print(outputString)
+                    await message.channel.send(outputString)
+            except:
+                await message.channel.send("Please specify the puzzle size, for example: !getpb dphdmn 4x4")
+    if '!getreq' in message.content:
+        with open('tiers.txt', 'r') as file:
+            mystr = file.read().lower()  # .replace('\n', '')
+        # print(mystr)
+        mystr = mystr.splitlines()
+        contentArray = message.content.lower().split(' ')
+        # print(contentArray)
+        username = contentArray[1]
+        matching = [s for s in mystr if username in s]
+        my_string = matching[0]
+        my_string = my_string.split('\t')
+        # print(my_string)
+
+        bad = False
+        try:
+            puzzle = contentArray[2]
+            outputString = "Requirement for tier **" + my_string[0] + "** at the puzzle "
+            for i in range(1, len(my_string)):
+                try:
+                    number = float(my_string[i])
+                    intpart = int(math.floor(number))
+                    decimals = round(number - intpart, 3)
+                    x = str(datetime.timedelta(seconds=intpart)) + str(decimals)[1:]
+                except:
+                    x = ""
+                if x != "":
+                    if int(intpart) > 60:
+                        my_string[i] = my_string[i] + " (" + x[2:] + ")"
+
+            if puzzle == "3" or puzzle == "3x3":
+                outputString += "3x3\n```"
+                outputString += "ao5: " + my_string[1] + "\n"
+                outputString += "ao12: " + my_string[2] + "\n"
+                outputString += "ao50: " + my_string[3] + "\n"
+                outputString += "ao100: " + my_string[4] + "\n"
+                outputString += "x10 marathon: " + my_string[5] + "\n"
+                outputString += "x42 marathon: " + my_string[6] + "\n```"
+            elif puzzle == "4" or puzzle == "4x4":
+                outputString += "4x4\n```"
+                outputString += "single: " + my_string[7] + "\n"
+                outputString += "ao5: " + my_string[8] + "\n"
+                outputString += "ao12: " + my_string[9] + "\n"
+                outputString += "ao50: " + my_string[10] + "\n"
+                outputString += "ao100: " + my_string[11] + "\n"
+                outputString += "x10 marathon: " + my_string[12] + "\n"
+                outputString += "x42 marathon: " + my_string[13] + "\n"
+                outputString += "4x4 - 2x2 relay: " + my_string[14] + "\n```"
+            elif puzzle == "5" or puzzle == "5x5":
+                outputString += "5x5\n```"
+                outputString += "single: " + my_string[15] + "\n"
+                outputString += "ao5: " + my_string[16] + "\n"
+                outputString += "ao12: " + my_string[17] + "\n"
+                outputString += "ao50: " + my_string[18] + "\n"
+                outputString += "5x5 - 2x2 relay: " + my_string[19] + "\n```"
+            elif puzzle == "6" or puzzle == "6x6":
+                outputString += "6x6\n```"
+                outputString += "single: " + my_string[20] + "\n"
+                outputString += "ao5: " + my_string[21] + "\n"
+                outputString += "ao12: " + my_string[22] + "\n"
+                outputString += "6x6 - 2x2 relay: " + my_string[23] + "\n```"
+            elif puzzle == "7" or puzzle == "7x7":
+                outputString += "7x7\n```"
+                outputString += "single: " + my_string[24] + "\n"
+                outputString += "ao5: " + my_string[25] + "\n"
+                outputString += "7x7 - 2x2 relay: " + my_string[26] + "\n```"
+            elif puzzle == "8" or puzzle == "8x8":
+                outputString += "8x8\n```"
+                outputString += "single: " + my_string[27] + "\n"
+                outputString += "ao5: " + my_string[28] + "\n```"
+            elif puzzle == "9" or puzzle == "9x9":
+                outputString += "9x9\n```"
+                outputString += "single: " + my_string[29] + "\n```"
+            elif puzzle == "10" or puzzle == "10x10":
+                outputString += "10x10\n```"
+                outputString += "single: " + my_string[30] + "\n```"
+            else:
+                await message.channel.send("Can't find this puzzle, make sure it's from 3x3 to 10x10.")
+                bad = True
+            if not bad:
+                await message.channel.send(outputString)
+        except:
+            await message.channel.send("Please specify the puzzle size, for example: !getreq ascended 4x4")
+    if '!getprob' in message.content.lower(): #!getprob 4x4 30 40 1000, or !getprob 4x4 30 40, or !getprob 4x4 30
+        try:
+            examples="- !getprob <puzzle> <moves> [<moves>, <amount> || <amount] - get probability of getting N moves optimal scramble\nCommand examples:\n```!getprob 4x4 30 - get probability for 4x4 in 30 moves\n!getprob 4x4 30 40 - get probability for 4x4 from 30 to 40 moves\n!getprob 4x4 30 40 _1000 - from 30 to 40 moves, repeat 1000 times (default 100)\n!getprob 4x4 30 _1000 - 30 moves, repeat 1000 times\n!getprob 3x3 20 - 3x3 puzzle```\n"
+            contentArray = message.content.lower().split(' ')
+            arraylen = len(contentArray)
+            if arraylen == 1:
+                await message.channel.send(examples)
+            elif arraylen == 2:
+                examples = "Command should have at least 3 words in it.\n" + examples
+                await message.channel.send(examples)
+            elif arraylen == 3:
+                pzlName = contentArray[1]
+                if pzlName == "3x3" or pzlName == "4x4":
+                    num = contentArray[2]
+                    if num.isdigit():
+                        f1 = num
+                        f2 = num
+                        await message.channel.send(getProbText(f1, f2, pzlName, 100))
+                    else:
+                        examples = "Something is wrong with your range number, most be positive integer.\n" + examples
+                        await message.channel.send(examples)
+                else:
+                    examples = "Something is wrong with your puzzle size (must be 4x4 or 3x3)\n" + examples
+                    await message.channel.send(examples)
+            else:
+                pzlName = contentArray[1]
+                if pzlName == "3x3" or pzlName == "4x4":
+                    if arraylen == 4: #expect number and amount rep OR number and second number
+                        num = contentArray[2]
+                        if num.isdigit():
+                            otherThing=contentArray[3]
+                            if otherThing[:1] == "_": #thiking that this is number and amount of rep
+                                num2 = otherThing[1:]
+                                if num2.isdigit():
+                                    await message.channel.send(getProbText(num, num, pzlName, num2))
+                                else:
+                                    examples = "Something is wrong with your range number, most be positive integer.\n" + examples
+                                    await message.channel.send(examples)
+                            else:#thinking that this number is just the 2nd range number
+                                num2 = otherThing
+                                if num2.isdigit():
+                                    await message.channel.send(getProbText(num, num2, pzlName, 100))
+                                else:
+                                    examples = "Something is wrong with your range number, most be positive integer.\n" + examples
+                                    await message.channel.send(examples)
+                        else:
+                            examples = "Something is wrong with your range number, most be positive integer.\n" + examples
+                            await message.channel.send(examples)
+                    else:#we have 5 inputs
+                        num1 = contentArray[2]
+                        num2 = contentArray[3]
+                        num3 = contentArray[4]
+                        trueNum3 = num3
+                        if num3[:1] == "_":
+                            trueNum3 = num3[1:]
+                        if num1.isdigit() and num2.isdigit() and trueNum3.isdigit():
+                            await message.channel.send(getProbText(num1, num2, pzlName, trueNum3))
+                        else:
+                            examples = "Something is wrong with your range number, most be positive integer.\n" + examples
+                            await message.channel.send(examples)
+                else:
+                    examples = "Something is wrong with your puzzle size (most be 4x4 or 3x3)\n" + examples
+                    await message.channel.send(examples)
+            #getProbText(f1, f2, pzlName, nscr)
+        except:
+            await message.channel.send("Something is wrong\n```" + traceback.format_exc() + "```")
     if '!ip' in message.content.lower():
         try:
             fp = urllib.request.urlopen("https://2ip.ru/")
@@ -343,11 +708,11 @@ async def on_message(message):
         except Exception as e:
             await message.channel.send("Something is wrong\n```"+str(e)+"```")
     if '!help' in message.content.lower():
-        await message.channel.send("Egg bot commands:```\n- !getwr <NxM> - get wr for this puzzle (single)\n- !wrsby <username> - get all wrs for that username [admin for big message]\n- !ip - get ip for multiplayer server (command works all the time even if server is offline, ask me for hosting)\n- !solve <scramble> - solve some 4x4 scramble```")
+        await message.channel.send("Egg bot commands:```\n- !getwr <NxM> - get wr for this puzzle (single)\n- !wrsby <username> - get all wrs for that username [admin for big message]\n- !ip - get ip for multiplayer server (command works all the time even if server is offline, ask me for hosting)\n- !solve <scramble> - solve some 4x4 scramble\n- !getpb <user> <puzzle> - get pb for one of 30 main categories in tier ranks, puzzle for 3x3 to 10x10\n- !getreq <tier> <puzzle> - get requirement for getting tier in new ranked system\n- !getprob <puzzle> <moves> [<moves>, <amount> || <amount] - get probability of getting N moves optimal scramble, type !getprob for examples```")
 @tasks.loop(seconds=1)
 async def spam(chan, msg):
     await chan.send(msg)
-client.run('PASTSECRETKEYHERE') //PASTE CODE HERE
+client.run('YOURSECRETKEY') #KEYNEEDED
 
 
  
